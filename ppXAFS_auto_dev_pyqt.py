@@ -347,7 +347,7 @@ class MainWindow(QtWidgets.QMainWindow):
             if files[0]:
                 finfo = QtCore.QFileInfo(files[0][0])
                 params.dir = finfo.path()
-                for fname in files[0]:
+                for fname in natsort.natsorted(files[0]):
                     info = QtCore.QFileInfo(fname)
                     cb = QtWidgets.QCheckBox(info.fileName())
                     cb.setObjectName(fname)
@@ -666,50 +666,60 @@ class MainWindow(QtWidgets.QMainWindow):
         energy = []
         each_ut_star = []
         each_ut = []
-        self.Ipos, self.Ineg = [x.rstrip().replace(' ','') for x in self.u.lE_posneg.text().split(',')]
-        if len(params.cbs) != 0:
+        try:
+            self.Ipos, self.Ineg = [x.rstrip().replace(' ','') for x in self.u.lE_posneg.text().split(',')]
+            if len(params.cbs) != 0:
+                checkedCB_objN = []
+                for cb in params.cbs:
+                    if cb.isChecked():
+                        checkedCB_objN.append(cb.objectName())
+
+                i = 0
+                for cb in params.cbs:
+                    if cb.isChecked():
+                        switch = "not read"
+                        # print cb.objectName()
+                        Fdat = PD.read_csv(cb.objectName(),delim_whitespace=True)
+                        #open(cb.objectName(),"rU")
+                        I0 = []
+                        I1 = []
+                        I2 = []
+                        if i == 0:
+                            energy = Fdat['SetEne'].values
+                        I0 = Fdat['I0'].values
+                        I1 = Fdat[self.Ipos].values
+                        I2 = Fdat[self.Ineg].values
+
+                        if i == 0:
+                            sumI0 = np.zeros(len(I0))
+                            sumI1 = np.zeros(len(I0))
+                            sumI2 = np.zeros(len(I0))
+                            mt = np.zeros(len(I0))
+                            mt_star = np.zeros(len(I0))
+                            delta_mt = np.zeros(len(I0))
+                        print (len(I0), len(sumI0))
+                        if len(I0) != len(sumI0):
+                            cb.setCheckState(QtCore.Qt.Unchecked)
+                            cb.setEnabled(False)
+                        else:
+                            sumI0 += np.array(I0)
+                            sumI1 += np.array(I1)
+                            sumI2 += np.array(I2)
+                            each_ut_star.append(np.array(I1)/np.array(I0))
+                            each_ut.append(np.array(I2) / np.array(I0))
+                        i +=1
             checkedCB_objN = []
             for cb in params.cbs:
                 if cb.isChecked():
                     checkedCB_objN.append(cb.objectName())
-            
-            i = 0
-            for cb in params.cbs:
-                if cb.isChecked():
-                    switch = "not read"
-                    # print cb.objectName()
-                    Fdat = PD.read_csv(cb.objectName(),delim_whitespace=True)
-                    #open(cb.objectName(),"rU")
-                    I0 = []
-                    I1 = []
-                    I2 = []
-                    if i == 0:
-                        energy = Fdat['SetEne'].values
-                    I0 = Fdat['I0'].values
-                    I1 = Fdat[self.Ipos].values
-                    I2 = Fdat[self.Ineg].values
+
+        except Exception as e:
+            msg = QtWidgets.QMessageBox()
+            msg.setIcon(QtWidgets.QMessageBox.Warning)
+            msg.setText(str(e))
+            msg.setStandardButtons(QtWidgets.QMessageBox.Ok)
+            msg.exec_()
                     
-                    each_ut_star.append(np.array(I1)/np.array(I0))
-                    each_ut.append(np.array(I2) / np.array(I0))
-                    if i == 0:
-                        sumI0 = np.zeros(len(I0))
-                        sumI1 = np.zeros(len(I0))
-                        sumI2 = np.zeros(len(I0))
-                        mt = np.zeros(len(I0))
-                        mt_star = np.zeros(len(I0))
-                        delta_mt = np.zeros(len(I0))
-                    if len(I0) != len(sumI0):
-                        cb.setCheckState(QtCore.Qt.Unchecked)
-                        cb.setEnabled(False)
-                    else:
-                        sumI0 += np.array(I0)
-                        sumI1 += np.array(I1)
-                        sumI2 += np.array(I2)
-                    i +=1
-        checkedCB_objN = []
-        for cb in params.cbs:
-            if cb.isChecked():
-                checkedCB_objN.append(cb.objectName())
         return sumI0, sumI1, sumI2, np.array(energy), \
                np.std(np.array(each_ut_star),axis=0)/math.sqrt(len(checkedCB_objN)),\
                np.std(np.array(each_ut),axis=0)/math.sqrt(len(checkedCB_objN))
